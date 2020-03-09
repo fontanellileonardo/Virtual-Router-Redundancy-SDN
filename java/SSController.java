@@ -5,6 +5,7 @@ import java.util.Collection;
 import java.util.Map;
 
 import org.projectfloodlight.openflow.protocol.OFMessage;
+import org.projectfloodlight.openflow.protocol.OFPacketIn;
 import org.projectfloodlight.openflow.protocol.OFType;
 import org.projectfloodlight.openflow.util.HexString;
 
@@ -17,6 +18,7 @@ import net.floodlightcontroller.core.module.FloodlightModuleException;
 import net.floodlightcontroller.core.module.IFloodlightModule;
 import net.floodlightcontroller.core.module.IFloodlightService;
 import net.floodlightcontroller.packet.Ethernet;
+import net.floodlightcontroller.packet.IPacket;
 
 public class SSController implements IFloodlightModule, IOFMessageListener {
 
@@ -38,19 +40,6 @@ public class SSController implements IFloodlightModule, IOFMessageListener {
 	public boolean isCallbackOrderingPostreq(OFType type, String name) {
 		// TODO Auto-generated method stub
 		return false;
-	}
-
-	//Packet-in is received
-	@Override
-	public Command receive(IOFSwitch sw, OFMessage msg, FloodlightContext cntx) {
-		Ethernet eth = IFloodlightProviderService.bcStore.get(cntx, IFloodlightProviderService.CONTEXT_PI_PAYLOAD);
-		
-		//Print source MAC address
-		Long sourceMACHash = Ethernet.toLong(eth.getSourceMACAddress().getBytes());
-		System.out.printf("Source MAC Address: {%s} on switch: {%s}\n", HexString.toHexString(sourceMACHash), sw.getId());
-		
-		//Let other module process the packet 
-		return Command.CONTINUE;
 	}
 
 	@Override
@@ -83,6 +72,25 @@ public class SSController implements IFloodlightModule, IOFMessageListener {
 	@Override
 	public void startUp(FloodlightModuleContext context) throws FloodlightModuleException {
 		floodlightProvider.addOFMessageListener(OFType.PACKET_IN, this);
+	}
+	
+	//Packet-in is received
+	@Override
+	public Command receive(IOFSwitch sw, OFMessage msg, FloodlightContext cntx) {
+		Ethernet eth = IFloodlightProviderService.bcStore.get(cntx, IFloodlightProviderService.CONTEXT_PI_PAYLOAD);
+		
+		//Cast packet
+		OFPacketIn pi = (OFPacketIn) msg;
+		
+		//Dissect Packet included in Packet-in
+		IPacket pkt = eth.getPayload();
+		
+		//Qua bisogna implementare la gestione del pacchetto -> chiamata handleIPPacket
+		//Per quanto riguarda la ARPRequest?
+		
+		
+		//Let other module process the packet 
+		return Command.CONTINUE;
 	}
 
 }
