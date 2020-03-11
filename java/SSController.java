@@ -17,8 +17,10 @@ import net.floodlightcontroller.core.module.FloodlightModuleContext;
 import net.floodlightcontroller.core.module.FloodlightModuleException;
 import net.floodlightcontroller.core.module.IFloodlightModule;
 import net.floodlightcontroller.core.module.IFloodlightService;
+import net.floodlightcontroller.packet.ARP;
 import net.floodlightcontroller.packet.Ethernet;
 import net.floodlightcontroller.packet.IPacket;
+import net.floodlightcontroller.packet.IPv4;
 
 public class SSController implements IFloodlightModule, IOFMessageListener {
 
@@ -85,12 +87,28 @@ public class SSController implements IFloodlightModule, IOFMessageListener {
 		//Dissect Packet included in Packet-in
 		IPacket pkt = eth.getPayload();
 		
-		//Qua bisogna implementare la gestione del pacchetto -> chiamata handleIPPacket
-		//Per quanto riguarda la ARPRequest?
+		if (eth.isBroadcast() || eth.isMulticast()) {
+			if (pkt instanceof ARP) {
+				handleARPRequest();
+			}
+		}
 		
+		if (pkt instanceof IPv4) {
+			IPv4 ip_pkt = (IPv4) pkt;
+			
+			if(ip_pkt.getDestinationAddress().compareTo(VIRTUAL_IP) != 0){
+				return Command.CONTINUE;
+			}
+			
+			handleIPPacket();
+		}
 		
-		//Let other module process the packet 
-		return Command.CONTINUE;
+		//Do not continue processing this OpenFlow message
+		return Command.STOP;
+	}
+	
+	public void handleARPRequest() {
+		Ethernet eth = IFloodlightProviderService.bcStore.get(cntx, IFloodlightProviderService.CONTEXT_PI_PAYLOAD);
 	}
 
 }
