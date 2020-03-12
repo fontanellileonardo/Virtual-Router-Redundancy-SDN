@@ -22,14 +22,14 @@ import net.floodlightcontroller.packet.Ethernet;
 import net.floodlightcontroller.packet.IPacket;
 import net.floodlightcontroller.packet.IPv4;
 
-public class SSController implements IFloodlightModule, IOFMessageListener {
+public class ARPController implements IFloodlightModule, IOFMessageListener {
 
 	protected IFloodlightProviderService floodlightProvider;
 	
 	//Set module name
 	@Override
 	public String getName() {
-		return SSController.class.getSimpleName();
+		return ARPController.class.getSimpleName();
 	}
 
 	@Override
@@ -87,22 +87,20 @@ public class SSController implements IFloodlightModule, IOFMessageListener {
 		//Dissect Packet included in Packet-in
 		IPacket pkt = eth.getPayload();
 		
-		if (pkt instanceof IPv4) {
-			IPv4 ip_pkt = (IPv4) pkt;
-			
-			if(ip_pkt.getDestinationAddress().compareTo(VIRTUAL_IP) != 0){
-				return Command.CONTINUE;
+		if (eth.isBroadcast() || eth.isMulticast()) {
+			if (pkt instanceof ARP) {
+				handleARPRequest();
 			}
-			
-			handleIPPacket();
-		}
 		
 		//Do not continue processing this OpenFlow message
 		return Command.STOP;
 	}
 	
-	public void handleIPPacket() {
+	public void handleARPRequest() {
 		Ethernet eth = IFloodlightProviderService.bcStore.get(cntx, IFloodlightProviderService.CONTEXT_PI_PAYLOAD);
+
+
+		
 	}
 
 }
