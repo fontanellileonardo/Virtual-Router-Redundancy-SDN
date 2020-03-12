@@ -39,7 +39,7 @@ def buildNetwork():
         h4 = net.addHost( 'h4', cls=Host, ip='10.0.3.3/24', defaultRoute='via 10.0.3.2')
     	h5 = net.addHost( 'h5', cls=Host, ip='10.0.3.4/24', defaultRoute='via 10.0.3.2')
 
-        net.addLink( h1, s1, 1, 1)
+        net.addLink(h1, s1, 1, 1)
         net.addLink(h2, s1, 1, 2)
 	net.addLink(h3, s1, 1, 3)
 	net.addLink(s1, r1, 4, 1, params2={ 'ip' : '10.0.2.1/24' })

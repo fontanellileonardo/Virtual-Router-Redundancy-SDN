@@ -8,7 +8,7 @@ import signal
 T_ADV = 1
 NUM_ADV_DOWN = 3*T_ADV
 
-COMM_PORT = 8888
+COMM_PORT = 8765
 BROADCAST_ADDRESS = "10.0.2.255"
 
 sock = None
