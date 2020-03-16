@@ -1,4 +1,4 @@
-package net.floodlightcontroller.project;
+package net.floodlightcontroller.task2;
 
 import org.projectfloodlight.openflow.types.*;
 
@@ -13,7 +13,7 @@ public class Parameters {
 	
 	public static int MASTER_ID = 1; //1: R1, 2: R2
 	
-	public final static TransportPort ADV_PORT = TransportPort.of(8765);
+	public final static TransportPort ADV_PORT = TransportPort.of(8888);
 
 	final static IPv4Address[] IP_ROUTER = {
 		IPv4Address.of("10.0.2.1"),

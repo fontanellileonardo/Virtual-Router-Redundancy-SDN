@@ -74,8 +74,7 @@ public class ARPController implements IOFMessageListener, IFloodlightModule {
 	}
 
 	@Override
-	public net.floodlightcontroller.core.IListener.Command receive(IOFSwitch sw, OFMessage msg,
-			FloodlightContext cntx) {
+	public net.floodlightcontroller.core.IListener.Command receive(IOFSwitch sw, OFMessage msg, FloodlightContext cntx) {
 			
 			Ethernet eth = IFloodlightProviderService.bcStore.get(cntx,
                 IFloodlightProviderService.CONTEXT_PI_PAYLOAD);
@@ -84,9 +83,9 @@ public class ARPController implements IOFMessageListener, IFloodlightModule {
 
 			// Print the source MAC address
 			Long sourceMACHash = Ethernet.toLong(eth.getSourceMACAddress().getBytes());
-			System.out.printf("MAC Address: {%s} seen on switch: {%s}\n",
-			HexString.toHexString(sourceMACHash),
-			sw.getId());
+			//System.out.printf("MAC Address: {%s} seen on switch: {%s}\n",
+			//HexString.toHexString(sourceMACHash),
+			//sw.getId());
 			
 			// Cast to Packet-In
 			OFPacketIn pi = (OFPacketIn) msg;
@@ -183,6 +182,7 @@ public class ARPController implements IOFMessageListener, IFloodlightModule {
 					
 			System.out.println("Managing Broadcast ARP Request...");
 			
+			//in sospeso
 			//boh come cazzo si fa?
 			//di tecco fa le due funzioni addBroadcastFlowRule e addVirtualFlowRule
 		}		
