@@ -5,6 +5,7 @@ import org.projectfloodlight.openflow.types.*;
 public class Parameters {
 	
 	public final static int NUM_ROUTERS = 2;
+	
 	public final static int T_ADV = 1000; //interval of router advertisements (1000ms = 1sec)
 	public final static int T_DOWN = 3 * T_ADV; //time after which a router is considered dead
 	
@@ -13,6 +14,12 @@ public class Parameters {
 	public static boolean BACKUP_STATUS = true;
 	
 	public static int MASTER_ID = 1; //1: R1, 2: R2
+	
+	public final static int ICMP_IDLE_TIMEOUT = 1;
+	public final static int ICMP_HARD_TIMEOUT = 2;
+	
+	public final static int ARP_IDLE_TIMEOUT = 10;
+	public final static int ARP_HARD_TIMEOUT = 20;
 	
 	public final static TransportPort ADV_PORT = TransportPort.of(7777);
 

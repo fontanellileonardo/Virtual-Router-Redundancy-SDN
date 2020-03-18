@@ -23,7 +23,7 @@ import net.floodlightcontroller.util.FlowModUtils;
 public class ARPController implements IOFMessageListener, IFloodlightModule {
 	
 	protected IFloodlightProviderService floodlightProvider; // Reference to the provider
-
+		
 	@Override
 	public String getName() {
 		return ARPController.class.getSimpleName();
@@ -219,8 +219,8 @@ public class ARPController implements IOFMessageListener, IFloodlightModule {
 		
 		OFFlowAdd.Builder fmb = sw.getOFFactory().buildFlowAdd();
 		
-		fmb.setIdleTimeout(0);
-		fmb.setHardTimeout(0);
+		fmb.setIdleTimeout(Parameters.ICMP_IDLE_TIMEOUT);
+		fmb.setHardTimeout(Parameters.ICMP_HARD_TIMEOUT);
 		fmb.setBufferId(OFBufferId.NO_BUFFER);
 		fmb.setOutPort(OFPort.ANY);
 		fmb.setCookie(U64.of(0));
@@ -289,8 +289,8 @@ public class ARPController implements IOFMessageListener, IFloodlightModule {
 	private void recvICMP(IOFSwitch sw, OFPacketIn pi, FloodlightContext cntx, IPv4Address src, IPv4Address dst) {
 		OFFlowAdd.Builder fmb = sw.getOFFactory().buildFlowAdd();
 		
-		fmb.setIdleTimeout(0);
-		fmb.setHardTimeout(0);
+		fmb.setIdleTimeout(Parameters.ICMP_IDLE_TIMEOUT);
+		fmb.setHardTimeout(Parameters.ICMP_HARD_TIMEOUT);
 		fmb.setBufferId(OFBufferId.NO_BUFFER);
 		fmb.setOutPort(OFPort.ANY);
 		fmb.setCookie(U64.of(0));
