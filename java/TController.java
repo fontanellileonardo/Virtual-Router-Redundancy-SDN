@@ -2,6 +2,7 @@ package net.floodlightcontroller.task2;
 
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.HashMap;
 import java.util.Map;
 import java.util.Timer;
 import java.util.TimerTask;
@@ -38,22 +39,16 @@ public class TController implements IFloodlightModule, IOFMessageListener {
 	protected IFloodlightProviderService floodlightProvider; // Reference to the provider
 	private IOFSwitch sw;
 	
-	private static Timer MASTER_TIMER = null, BACKUP_TIMER = null;
-	//TimerTask routerDisconnection = null;
+	private HashMap<Integer, Long> timestamps = new HashMap<Integer, Long>(); //coppie <ROUTER_ID, timestamp>
+	
+	private static Timer TIMER = null;
+	TimerTask routerDisconnection = null;
 	
 	public class MasterHandler extends TimerTask {
 		public void run() {
 			System.out.println("Master Timer expired! \n");
 			
 			handleMasterTimeout();
-		}
-	}
-	
-	public class BackupHandler extends TimerTask {
-		public void run() {
-			System.out.println("Backup Timer expired! \n");
-			
-			handleBackupTimeout();
 		}
 	}
 	
@@ -111,14 +106,10 @@ public class TController implements IFloodlightModule, IOFMessageListener {
 		
 		floodlightProvider.addOFMessageListener(OFType.PACKET_IN, this);
 		
-		MASTER_TIMER = new Timer();
-		BACKUP_TIMER = new Timer();
-		
-		MASTER_TIMER.schedule(new MasterHandler(), Parameters.T_DOWN);		
-		BACKUP_TIMER.schedule(new BackupHandler(), Parameters.T_DOWN);
+		for(int i=0; i<Parameters.NUM_ROUTERS; i++)
+			timestamps.put(i+1, (long) 0);
 		
 		System.out.println("\n TController Starting...\n");
-
 	}
 	
 	@Override
@@ -147,18 +138,16 @@ public class TController implements IFloodlightModule, IOFMessageListener {
 						
 						//ROUTER ID is in the payload of advertisement
 						Data payload = (Data) udp.getPayload();
-						int id = Integer.parseInt(new String(payload.getData()));
-						System.out.println("Received ADV from Router "+id+"\n");
 						
-						if(id == Parameters.MASTER_ID) {
-							Parameters.MASTER_STATUS = true;
-							resetTimer(MASTER_TIMER, new MasterHandler());
-							
-						} else {
-							
-							Parameters.BACKUP_STATUS = true;
-							resetTimer(BACKUP_TIMER, new BackupHandler());
-						}
+						int id = Integer.parseInt(new String(payload.getData()));
+						long currentTS = System.currentTimeMillis() / 1000;
+						
+						System.out.println("Router "+id+": "+currentTS);
+						
+						timestamps.put(id, currentTS);
+						
+						if(id == Parameters.MASTER_ID) resetTimer();
+
 						return Command.STOP;	
 					}
 				}
@@ -168,36 +157,36 @@ public class TController implements IFloodlightModule, IOFMessageListener {
 		return Command.CONTINUE;
 	}
 	
-	private void resetTimer(Timer TIMER, TimerTask task)
+	private void resetTimer()
 	{
-		TIMER.cancel();
-		TIMER.purge();
+		if(TIMER != null) {
+			TIMER.cancel();
+			TIMER.purge();
+		}
+		
 		TIMER = new Timer();
-		TIMER.schedule(task, Parameters.T_DOWN);
+		TIMER.schedule(new MasterHandler(), Parameters.T_DOWN);
 		
 	}
 	
 	private void handleMasterTimeout() {
 		
+		int backup_id = (Parameters.MASTER_ID == 1)? 2 : 1;
 		Parameters.MASTER_STATUS = false;
 		
 		System.out.println("MASTER ("+Parameters.MASTER_ID+") is down. Attempting to connect to backup...");
-		
-		if(Parameters.BACKUP_STATUS == false) close();
+
+		if((System.currentTimeMillis() / 1000) - timestamps.get(backup_id) >= 3) close(); //last ADV from backup was over 3secs ago -> router dead
 		else {
-			Parameters.MASTER_ID = (Parameters.MASTER_ID == 1)? 2 : 1;
+			Parameters.MASTER_ID = backup_id;
 			Parameters.MASTER_STATUS = true;
 			Parameters.BACKUP_STATUS = false;
 			
 			System.out.println("Router "+Parameters.MASTER_ID+" is now MASTER.");
 			
-			resetTimer(MASTER_TIMER, new MasterHandler());
+			resetTimer();
 			resetRules();
 		}
-	}
-	
-	private void handleBackupTimeout() {
-		Parameters.BACKUP_STATUS = false;
 	}
 	
 	private void close() {
@@ -246,3 +235,4 @@ public class TController implements IFloodlightModule, IOFMessageListener {
         sw.write(fb.build());
 	}
 }
+

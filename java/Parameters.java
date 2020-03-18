@@ -4,6 +4,7 @@ import org.projectfloodlight.openflow.types.*;
 
 public class Parameters {
 	
+	public final static int NUM_ROUTERS = 2;
 	public final static int T_ADV = 1000; //interval of router advertisements (1000ms = 1sec)
 	public final static int T_DOWN = 3 * T_ADV; //time after which a router is considered dead
 	
@@ -13,7 +14,7 @@ public class Parameters {
 	
 	public static int MASTER_ID = 1; //1: R1, 2: R2
 	
-	public final static TransportPort ADV_PORT = TransportPort.of(8888);
+	public final static TransportPort ADV_PORT = TransportPort.of(7777);
 
 	final static IPv4Address[] IP_ROUTER = {
 		IPv4Address.of("10.0.2.1"),

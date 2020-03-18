@@ -4,11 +4,12 @@ import select
 import netifaces as ni
 import sys
 import signal
+from datetime import datetime
 
 T_ADV = 1
 NUM_ADV_DOWN = 3*T_ADV
 
-COMM_PORT = 8888
+COMM_PORT = 7777
 BROADCAST_ADDRESS = "10.0.2.255"
 
 sock = None
@@ -16,24 +17,27 @@ ROUTER_ID = sys.argv[1]
 
 def init():
     
-    global sock
+	global sock
 
-    sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM, socket.IPPROTO_UDP)
-    sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEPORT, 1)
-    sock.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
+	sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM, socket.IPPROTO_UDP)
+	sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEPORT, 1)
+	sock.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
 
-    sock.bind(("", COMM_PORT))
+	sock.bind(("", COMM_PORT))
 
-    print "[INFO] Socket bound to port %d" %(COMM_PORT)
+	print("[INFO] Socket bound to port " +str(COMM_PORT))
 
-    sock.sendto(ROUTER_ID, (BROADCAST_ADDRESS, COMM_PORT))
-    print "[INFO] Packet sent to %s throught port %s" %(BROADCAST_ADDRESS, COMM_PORT)
+	#sock.sendto(ROUTER_ID + str(datetime.timestamp(datetime.now())), (BROADCAST_ADDRESS, COMM_PORT))
+	payload = ROUTER_ID
+	sock.sendto(payload.encode(), (BROADCAST_ADDRESS, COMM_PORT));
+	print("[INFO] Packet sent to "+str(BROADCAST_ADDRESS)+" throught port "+str(COMM_PORT))
     
 def advertise():
 
 	while True:
-		sock.sendto(ROUTER_ID, (BROADCAST_ADDRESS, COMM_PORT));
-		#print ROUTER_ID+"-HELLO"
+		payload = ROUTER_ID
+		sock.sendto(payload.encode(), (BROADCAST_ADDRESS, COMM_PORT));
+		print(str(time.time())+") R"+payload+" HELLO")
 		time.sleep(T_ADV)
 
 if __name__ == '__main__':
