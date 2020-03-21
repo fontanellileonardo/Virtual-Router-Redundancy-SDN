@@ -83,44 +83,36 @@ public class ARPController implements IOFMessageListener, IFloodlightModule {
 
 			// Print the source MAC address
 			Long sourceMACHash = Ethernet.toLong(eth.getSourceMACAddress().getBytes());
-			//System.out.printf("MAC Address: {%s} seen on switch: {%s}\n",
-			//HexString.toHexString(sourceMACHash),
-			//sw.getId());
 			
 			// Cast to Packet-In
 			OFPacketIn pi = (OFPacketIn) msg;
 
 	        // Dissect Packet included in Packet-In
-			if (eth.isBroadcast() || eth.isMulticast() || eth.getDestinationMACAddress().compareTo(Parameters.VIRTUAL_MAC) == 0) {
-				if (pkt instanceof ARP) {
-					
-					System.out.printf("Processing ARP request\n");
-					
-					// Process ARP request
-					handleARPRequest(sw, pi, cntx);
-					
-					// Interrupt the chain
-					return Command.STOP;
+			if (pkt instanceof ARP) {
+				if (eth.isBroadcast() || eth.isMulticast() 
+						|| eth.getDestinationMACAddress().compareTo(Parameters.VIRTUAL_MAC) == 0 
+						|| eth.getSourceMACAddress().compareTo(Parameters.MAC_ROUTER[0]) == 0 
+						|| eth.getSourceMACAddress().compareTo(Parameters.MAC_ROUTER[1])== 0) {
+				
+				System.out.printf("Processing ARP request...\n");
+				
+				// Process ARP request
+				handleARPRequest(sw, pi, cntx);
+				
+				// Interrupt the chain
+				return Command.STOP;
 				}
-			} else {
-				if (pkt instanceof IPv4) {
+			} else if (pkt instanceof IPv4) {
 					
-					System.out.printf("Processing IPv4 packet\n");
+					System.out.printf("Processing IPv4 packet...\n");
 					
 					IPv4 ip_pkt = (IPv4) pkt;
 					
-					if(ip_pkt.getDestinationAddress().compareTo(Parameters.VIRTUAL_IP) == 0){
-						handleIPPacket(sw, pi, cntx);
-						
-						// Interrupt the chain
-						return Command.STOP;
-					}
-				}
-			}
-			
-			// Interrupt the chain
-			return Command.CONTINUE;
+					handleIPPacket(sw, pi, cntx);
 
+					return Command.STOP;
+			}
+			return Command.CONTINUE;
 	}
 	
 	private void handleARPRequest(IOFSwitch sw, OFPacketIn pi, FloodlightContext cntx) {
@@ -135,7 +127,11 @@ public class ARPController implements IOFMessageListener, IFloodlightModule {
 		// Cast the ARP request
 		ARP arpRequest = (ARP) eth.getPayload();
 		
-		if(arpRequest.getTargetProtocolAddress().compareTo(Parameters.VIRTUAL_IP) == 0) { //Destination Virtual Router			
+		if(arpRequest.getTargetProtocolAddress().compareTo(Parameters.VIRTUAL_IP) == 0) { 
+			//Destination Virtual Router because we want to travel to network B
+			//host is trying to discover who has this virtual IP
+			//I (the controller) will respond to this ARP request
+			
 			System.out.printf("Managing Virtual ARP Request...");
 			// Generate ARP reply
 			IPacket arpReply = new Ethernet()
@@ -178,15 +174,161 @@ public class ARPController implements IOFMessageListener, IFloodlightModule {
 			
 			sw.write(pob.build());
 		}
-		else { //Destination node of network A
+		else if(eth.getSourceMACAddress().compareTo(Parameters.MAC_ROUTER[0]) == 0 || eth.getSourceMACAddress().compareTo(Parameters.MAC_ROUTER[1])== 0) { 
+			//Destination node of network A, ARP coming from R2 (net B) aimed at discovering host_A address
+			//I want to hide the real MAC of R2 and mask it with the VIRTUAL MAC
 					
-			System.out.println("Managing Broadcast ARP Request...");
+			System.out.println("Managing incoming ARP Request from net B...");
 			
-			//in sospeso
-			//boh come cazzo si fa?
-			//di tecco fa le due funzioni addBroadcastFlowRule e addVirtualFlowRule
-		}		
-	}
+			OFFlowAdd.Builder fmb = sw.getOFFactory().buildFlowAdd();
+			
+			fmb.setIdleTimeout(Parameters.ARP_IDLE_TIMEOUT);
+			fmb.setHardTimeout(Parameters.ARP_HARD_TIMEOUT);
+			fmb.setBufferId(OFBufferId.NO_BUFFER);
+			fmb.setOutPort(OFPort.ANY);
+			fmb.setCookie(U64.of(0));
+			fmb.setPriority(FlowModUtils.PRIORITY_MAX);
+			
+			// Create the match structure  
+			Match.Builder mb = sw.getOFFactory().buildMatch();
+			mb.setExact(MatchField.ETH_TYPE, EthType.ARP)
+				.setExact(MatchField.ETH_SRC, eth.getSourceMACAddress());
+			
+			OFActions actions = sw.getOFFactory().actions();
+			
+			// Create the actions (Change the SRC_MAC to VIRTUAL_MAC)
+			ArrayList<OFAction> actionList = new ArrayList<OFAction>();
+			
+			OFOxms oxms = sw.getOFFactory().oxms();
+			
+			OFActionSetField setVMAC = actions.buildSetField()
+				    .setField(
+				        oxms.buildEthSrc()
+				        .setValue(Parameters.VIRTUAL_MAC)
+				        .build()
+				    )
+				    .build();
+			actionList.add(setVMAC);
+			
+			setVMAC = actions.buildSetField()
+				    .setField(
+				        oxms.buildArpSha() //sha = sender hardware address
+				        .setValue(Parameters.VIRTUAL_MAC)
+				        .build()
+				    )
+				    .build();
+			actionList.add(setVMAC);
+			
+			OFActionSetField setVIP = actions.buildSetField()
+				    .setField(
+				        oxms.buildArpSpa() //spa = sender protocol address
+				        .setValue(Parameters.VIRTUAL_IP)
+				        .build()
+				    )
+				    .build();
+			actionList.add(setVIP);
+			
+			//specify the port
+			OFActionOutput output = actions.buildOutput()
+				    .setMaxLen(0xFFffFFff)
+				    .setPort(OFPort.FLOOD)
+				    .build();
+			actionList.add(output);
+			
+			fmb.setActions(actionList);
+			fmb.setMatch(mb.build());
+			
+			sw.write(fmb.build());
+			
+			//INSTALLING opposite rule -> when host A replies to ARP request to router
+			fmb = null;
+			fmb = sw.getOFFactory().buildFlowAdd();
+			
+			fmb.setIdleTimeout(Parameters.ARP_IDLE_TIMEOUT);
+			fmb.setHardTimeout(Parameters.ARP_HARD_TIMEOUT);
+			fmb.setBufferId(OFBufferId.NO_BUFFER);
+			fmb.setOutPort(OFPort.CONTROLLER);
+			fmb.setCookie(U64.of(0));
+			fmb.setPriority(FlowModUtils.PRIORITY_MAX);
+			
+			// Create the match structure  
+			mb = null;
+			mb = sw.getOFFactory().buildMatch();
+			mb.setExact(MatchField.ETH_TYPE, EthType.ARP)
+				.setExact(MatchField.ETH_DST, Parameters.VIRTUAL_MAC);
+				//.setExact(MatchField.ETH_SRC, eth.getDestinationMACAddress()); //src mac is the one from the host of net A
+			
+			actions = null;
+			actions = sw.getOFFactory().actions();
+			
+			// Create the actions (Change the SRC_MAC to VIRTUAL_MAC)
+			ArrayList<OFAction> actionListRev = new ArrayList<OFAction>();
+			
+			oxms = null;
+			oxms = sw.getOFFactory().oxms();
+			
+			OFActionSetField setMAC = actions.buildSetField()
+				    .setField(
+				        oxms.buildEthDst()
+				        .setValue(eth.getSourceMACAddress())
+				        .build()
+				    )
+				    .build();
+			actionListRev.add(setMAC);
+			
+			setVMAC = actions.buildSetField()
+				    .setField(
+				        oxms.buildArpTha() //tha = target hardware address
+				        .setValue(eth.getSourceMACAddress())
+				        .build()
+				    )
+				    .build();
+			actionListRev.add(setMAC);
+			
+			OFActionSetField setIP = actions.buildSetField()
+				    .setField(
+				        oxms.buildArpTpa() //tpa = target protocol address
+				        .setValue(arpRequest.getSenderProtocolAddress())
+				        .build()
+				    )
+				    .build();
+			actionListRev.add(setIP);
+			
+			//specify the port
+			output = null;
+			output = actions.buildOutput()
+				    .setMaxLen(0xFFffFFff)
+				    .setPort(pi.getMatch().get(MatchField.IN_PORT))
+				    .build();
+			actionListRev.add(output);
+			
+			fmb.setActions(actionListRev);
+			fmb.setMatch(mb.build());
+			
+			sw.write(fmb.build());
+			// If we do not apply the same action to the packet we have received and we send it back the first packet will be lost
+			
+			// Create the Packet-Out and set basic data for it (buffer id and in port)
+			OFPacketOut.Builder pob = sw.getOFFactory().buildPacketOut();
+			pob.setBufferId(pi.getBufferId());
+			pob.setInPort(OFPort.ANY);
+			
+			// Assign the action
+			pob.setActions(actionList);
+			
+			// Packet might be buffered in the switch or encapsulated in Packet-In 
+			// If the packet is encapsulated in Packet-In sent it back
+			if (pi.getBufferId() == OFBufferId.NO_BUFFER) {
+				// Packet-In buffer-id is none, the packet is encapsulated -> send it back
+			    		byte[] packetData = pi.getData();
+			    		pob.setData(packetData);
+			    
+			} 
+					
+			sw.write(pob.build());
+		}
+
+	}		
 
 	private void handleIPPacket(IOFSwitch sw, OFPacketIn pi,
 			FloodlightContext cntx) {
@@ -217,6 +359,8 @@ public class ARPController implements IOFMessageListener, IFloodlightModule {
 	//Add rule from network A to network B
 	private void sendICMP(IOFSwitch sw, OFPacketIn pi, FloodlightContext cntx, IPv4Address src, IPv4Address dst) {
 		
+		System.out.println("Adding rule for (outgoing) ICMP packets...");
+		
 		OFFlowAdd.Builder fmb = sw.getOFFactory().buildFlowAdd();
 		
 		fmb.setIdleTimeout(Parameters.ICMP_IDLE_TIMEOUT);
@@ -235,7 +379,7 @@ public class ARPController implements IOFMessageListener, IFloodlightModule {
 			.setExact(MatchField.IP_PROTO, IpProtocol.ICMP);
 			
 		OFActions actions = sw.getOFFactory().actions();
-        
+		
 		// Create the actions (Change DST mac and IP addresses and set the out-port)
 		ArrayList<OFAction> actionList = new ArrayList<OFAction>();
 		
@@ -257,14 +401,12 @@ public class ARPController implements IOFMessageListener, IFloodlightModule {
 		actionList.add(output);
 		
 		fmb.setActions(actionList);
-        	fmb.setMatch(mb.build());
-
-	        sw.write(fmb.build());
-	        
-	        System.out.println("sendICMP rule added!");
-	        
-	        // If we do not apply the same action to the packet we have received and we send it back the first packet will be lost
-        
+			fmb.setMatch(mb.build());
+		
+		    sw.write(fmb.build());
+		    
+		    // If we do not apply the same action to the packet we have received and we send it back the first packet will be lost
+		
 		// Create the Packet-Out and set basic data for it (buffer id and in port)
 		OFPacketOut.Builder pob = sw.getOFFactory().buildPacketOut();
 		pob.setBufferId(pi.getBufferId());
@@ -277,9 +419,9 @@ public class ARPController implements IOFMessageListener, IFloodlightModule {
 		// If the packet is encapsulated in Packet-In sent it back
 		if (pi.getBufferId() == OFBufferId.NO_BUFFER) {
 			// Packet-In buffer-id is none, the packet is encapsulated -> send it back
-            		byte[] packetData = pi.getData();
-            		pob.setData(packetData);
-            
+		    		byte[] packetData = pi.getData();
+		    		pob.setData(packetData);
+		    
 		} 
 				
 		sw.write(pob.build());
@@ -287,6 +429,9 @@ public class ARPController implements IOFMessageListener, IFloodlightModule {
 	
 	//Add rule from network B to network A
 	private void recvICMP(IOFSwitch sw, OFPacketIn pi, FloodlightContext cntx, IPv4Address src, IPv4Address dst) {
+		
+		System.out.println("Adding rule for (incoming) ICMP packets...");
+		
 		OFFlowAdd.Builder fmb = sw.getOFFactory().buildFlowAdd();
 		
 		fmb.setIdleTimeout(Parameters.ICMP_IDLE_TIMEOUT);
@@ -310,14 +455,14 @@ public class ARPController implements IOFMessageListener, IFloodlightModule {
 		OFOxms oxms = sw.getOFFactory().oxms();
 		
 		//change source MAC -> VIRTUAL_MAC
-		OFActionSetField setDlDst = actions.buildSetField()
+		OFActionSetField setSrcVMAC = actions.buildSetField()
 			    .setField(
-			        oxms.buildEthDst()
+			        oxms.buildEthSrc()
 			        .setValue(Parameters.VIRTUAL_MAC)
 			        .build()
 			    )
 			    .build();
-		actionList.add(setDlDst);
+		actionList.add(setSrcVMAC);
 		
 		OFActionOutput output = actions.buildOutput()
 			    .setMaxLen(0xFFffFFff)
@@ -329,8 +474,6 @@ public class ARPController implements IOFMessageListener, IFloodlightModule {
         	fmb.setMatch(mb.build());
 
 	        sw.write(fmb.build());
-	        
-	        System.out.println("recvICMP rule added!");
 	}
 	
 	private void ICMP_unreachable(IOFSwitch sw, OFPacketIn pi, FloodlightContext cntx, IPv4Address src, IPv4Address dst) {

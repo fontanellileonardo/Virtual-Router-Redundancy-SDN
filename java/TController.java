@@ -138,11 +138,11 @@ public class TController implements IFloodlightModule, IOFMessageListener {
 						
 						//ROUTER ID is in the payload of advertisement
 						Data payload = (Data) udp.getPayload();
-						
+
 						int id = Integer.parseInt(new String(payload.getData()));
 						long currentTS = System.currentTimeMillis() / 1000;
 						
-						System.out.println("Router "+id+": "+currentTS);
+						//System.out.println("Router "+id+": "+currentTS);
 						
 						timestamps.put(id, currentTS);
 						

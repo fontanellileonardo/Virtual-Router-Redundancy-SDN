@@ -9,7 +9,7 @@ from datetime import datetime
 T_ADV = 1
 NUM_ADV_DOWN = 3*T_ADV
 
-COMM_PORT = 7777
+COMM_PORT = 8787
 BROADCAST_ADDRESS = "10.0.2.255"
 
 sock = None
@@ -27,7 +27,6 @@ def init():
 
 	print("[INFO] Socket bound to port " +str(COMM_PORT))
 
-	#sock.sendto(ROUTER_ID + str(datetime.timestamp(datetime.now())), (BROADCAST_ADDRESS, COMM_PORT))
 	payload = ROUTER_ID
 	sock.sendto(payload.encode(), (BROADCAST_ADDRESS, COMM_PORT));
 	print("[INFO] Packet sent to "+str(BROADCAST_ADDRESS)+" throught port "+str(COMM_PORT))
