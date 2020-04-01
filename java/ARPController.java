@@ -12,8 +12,6 @@ import org.projectfloodlight.openflow.protocol.match.Match;
 import org.projectfloodlight.openflow.protocol.match.MatchField;
 import org.projectfloodlight.openflow.protocol.oxm.OFOxms;
 import org.projectfloodlight.openflow.types.*;
-import org.projectfloodlight.openflow.util.HexString;
-import org.python.constantine.platform.darwin.IPProto;
 
 import net.floodlightcontroller.core.*;
 import net.floodlightcontroller.core.module.*;
@@ -350,16 +348,38 @@ public class ARPController implements IOFMessageListener, IFloodlightModule {
 		IPv4Address dst = ipv4.getDestinationAddress();
 		
 		if(Parameters.MASTER_STATUS) {
-			sendICMP(sw, pi, cntx, src, dst);
-			recvICMP(sw, pi, cntx, src, dst);
+			ArrayList<OFAction> sendList = sendICMP(sw, pi, cntx, eth);
+			ArrayList<OFAction> recvList = recvICMP(sw, pi, cntx, eth);
+			
+			OFPacketOut.Builder pob = sw.getOFFactory().buildPacketOut();
+			pob.setBufferId(pi.getBufferId());
+			pob.setInPort(OFPort.ANY);
+			
+			// Assign the action
+			if(eth.getDestinationMACAddress().compareTo(Parameters.VIRTUAL_MAC) == 0)
+				pob.setActions(sendList);
+			else 
+				pob.setActions(recvList);
+			
+			// Packet might be buffered in the switch or encapsulated in Packet-In 
+			// If the packet is encapsulated in Packet-In sent it back
+			if (pi.getBufferId() == OFBufferId.NO_BUFFER) {
+				// Packet-In buffer-id is none, the packet is encapsulated -> send it back
+			    		byte[] packetData = pi.getData();
+			    		pob.setData(packetData);
+			    
+			} 
+					
+			sw.write(pob.build());
+			
 		}
 		else ICMP_unreachable(sw, pi, cntx, src, dst);		
 	}
 	
 	//Add rule from network A to network B
-	private void sendICMP(IOFSwitch sw, OFPacketIn pi, FloodlightContext cntx, IPv4Address src, IPv4Address dst) {
+	private ArrayList<OFAction> sendICMP(IOFSwitch sw, OFPacketIn pi, FloodlightContext cntx, Ethernet eth) {
 		
-		System.out.println("Adding rule for (outgoing) ICMP packets...");
+		System.out.println("Adding rule for send ICMP packets...");
 		
 		OFFlowAdd.Builder fmb = sw.getOFFactory().buildFlowAdd();
 		
@@ -373,10 +393,7 @@ public class ARPController implements IOFMessageListener, IFloodlightModule {
 		// Create the match structure  
 		Match.Builder mb = sw.getOFFactory().buildMatch();
 		mb.setExact(MatchField.ETH_TYPE, EthType.IPv4)
-			.setExact(MatchField.IPV4_DST, dst)
-			.setExact(MatchField.ETH_DST, Parameters.VIRTUAL_MAC)
-			.setExact(MatchField.IPV4_SRC, src)
-			.setExact(MatchField.IP_PROTO, IpProtocol.ICMP);
+			.setExact(MatchField.ETH_DST, Parameters.VIRTUAL_MAC);
 			
 		OFActions actions = sw.getOFFactory().actions();
 		
@@ -405,32 +422,18 @@ public class ARPController implements IOFMessageListener, IFloodlightModule {
 		
 		    sw.write(fmb.build());
 		    
+		return actionList;
+		    
 		    // If we do not apply the same action to the packet we have received and we send it back the first packet will be lost
 		
 		// Create the Packet-Out and set basic data for it (buffer id and in port)
-		OFPacketOut.Builder pob = sw.getOFFactory().buildPacketOut();
-		pob.setBufferId(pi.getBufferId());
-		pob.setInPort(OFPort.ANY);
-		
-		// Assign the action
-		pob.setActions(actionList);
-		
-		// Packet might be buffered in the switch or encapsulated in Packet-In 
-		// If the packet is encapsulated in Packet-In sent it back
-		if (pi.getBufferId() == OFBufferId.NO_BUFFER) {
-			// Packet-In buffer-id is none, the packet is encapsulated -> send it back
-		    		byte[] packetData = pi.getData();
-		    		pob.setData(packetData);
-		    
-		} 
-				
-		sw.write(pob.build());
+		// Il packet_out viene creato solo se il packet_in era indirizzato al router (se vado dalla rete a alla b)
 	}
 	
 	//Add rule from network B to network A
-	private void recvICMP(IOFSwitch sw, OFPacketIn pi, FloodlightContext cntx, IPv4Address src, IPv4Address dst) {
+	private ArrayList<OFAction> recvICMP(IOFSwitch sw, OFPacketIn pi, FloodlightContext cntx, Ethernet eth) {
 		
-		System.out.println("Adding rule for (incoming) ICMP packets...");
+		System.out.println("Adding rule for recv ICMP packets...");
 		
 		OFFlowAdd.Builder fmb = sw.getOFFactory().buildFlowAdd();
 		
@@ -444,9 +447,7 @@ public class ARPController implements IOFMessageListener, IFloodlightModule {
 		// Create the match structure  
 		Match.Builder mb = sw.getOFFactory().buildMatch();
 		mb.setExact(MatchField.ETH_TYPE, EthType.IPv4)
-			.setExact(MatchField.IPV4_DST, src)
-			.setExact(MatchField.IPV4_SRC, dst)
-			.setExact(MatchField.IP_PROTO, IpProtocol.ICMP);
+			.setExact(MatchField.ETH_SRC, Parameters.MAC_ROUTER[1]); //Router 2 because is gateway for NetB
 			
 		OFActions actions = sw.getOFFactory().actions();
 
@@ -464,16 +465,30 @@ public class ARPController implements IOFMessageListener, IFloodlightModule {
 			    .build();
 		actionList.add(setSrcVMAC);
 		
-		OFActionOutput output = actions.buildOutput()
-			    .setMaxLen(0xFFffFFff)
-			    .setPort(pi.getMatch().get(MatchField.IN_PORT))
-			    .build();
-		actionList.add(output);
+		//if the received packet_in is a ping request 
+		if(eth.getDestinationMACAddress().compareTo(Parameters.VIRTUAL_MAC) == 0) {
+			OFActionOutput output = actions.buildOutput()
+				    .setMaxLen(0xFFffFFff)
+				    .setPort(pi.getMatch().get(MatchField.IN_PORT)) //sistemare porta nel caso in cui il pkt viene da dx
+				    .build();
+			actionList.add(output);
+		}
+		//if the packet_in received is a ping reply
+		else if(eth.getSourceMACAddress().compareTo(Parameters.MAC_ROUTER[1]) == 0) {
+			OFActionOutput output = actions.buildOutput()
+				    .setMaxLen(0xFFffFFff)
+				    .setPort(Parameters.H_PORTS.get(eth.getDestinationMACAddress())) //sistemare porta nel caso in cui il pkt viene da dx
+				    .build();
+			actionList.add(output);
+		}
 		
 		fmb.setActions(actionList);
-        	fmb.setMatch(mb.build());
+    	fmb.setMatch(mb.build());
 
-	        sw.write(fmb.build());
+        sw.write(fmb.build());
+        
+        return actionList;
+        
 	}
 	
 	private void ICMP_unreachable(IOFSwitch sw, OFPacketIn pi, FloodlightContext cntx, IPv4Address src, IPv4Address dst) {

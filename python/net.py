@@ -33,11 +33,11 @@ def buildNetwork():
 	s1 = net.addSwitch('s1', cls=OVSKernelSwitch)    
     	s2 = net.addSwitch('s2', cls=OVSKernelSwitch, failMode='standalone')
     
-        h1 = net.addHost( 'h1', cls=Host, ip='10.0.2.3/24', defaultRoute=virtualAddr )
-        h2 = net.addHost( 'h2', cls=Host, ip='10.0.2.4/24', defaultRoute=virtualAddr )
-        h3 = net.addHost( 'h3', cls=Host, ip='10.0.2.5/24', defaultRoute=virtualAddr )
-        h4 = net.addHost( 'h4', cls=Host, ip='10.0.3.3/24', defaultRoute='via 10.0.3.2')
-    	h5 = net.addHost( 'h5', cls=Host, ip='10.0.3.4/24', defaultRoute='via 10.0.3.2')
+        h1 = net.addHost('h1', cls=Host, ip='10.0.2.3/24', mac='00:00:00:00:00:a1', defaultRoute=virtualAddr)
+        h2 = net.addHost('h2', cls=Host, ip='10.0.2.4/24', mac='00:00:00:00:00:a2', defaultRoute=virtualAddr)
+        h3 = net.addHost('h3', cls=Host, ip='10.0.2.5/24', mac='00:00:00:00:00:a3', defaultRoute=virtualAddr)
+        h4 = net.addHost('h4', cls=Host, ip='10.0.3.3/24', defaultRoute='via 10.0.3.2')
+    	h5 = net.addHost('h5', cls=Host, ip='10.0.3.4/24', defaultRoute='via 10.0.3.2')
 
         net.addLink(h1, s1, 1, 1)
         net.addLink(h2, s1, 1, 2)

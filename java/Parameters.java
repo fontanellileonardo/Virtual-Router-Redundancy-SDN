@@ -1,6 +1,7 @@
 package net.floodlightcontroller.task2;
 
 import org.projectfloodlight.openflow.types.*;
+import java.util.*;
 
 public class Parameters {
 	
@@ -38,11 +39,19 @@ public class Parameters {
 	public final static IPv4Address VIRTUAL_IP = IPv4Address.of("10.0.2.254");
 	public final static MacAddress VIRTUAL_MAC = MacAddress.of("00:00:E5:00:01:01");
 	
+	//switch ports connected to routers, I can easily access them with ROUTER IDs
 	final static OFPort[] SW_PORTS = {
-			OFPort.of(4), //first 2 are the routers so I can access them with the ROUTER IDs
-			OFPort.of(5),
-			OFPort.of(1),
-			OFPort.of(2),
-			OFPort.of(3)			
+			OFPort.of(4),
+			OFPort.of(5)			
 	};
+	
+	//for simplicity's sake, host's MAC addresses have been hardcoded with the respective port
+	//if we wanted to do it dynamically, we could have saved this info the first time we receive an ARP request
+	public static HashMap<MacAddress, OFPort> H_PORTS;
+	static {
+		H_PORTS = new HashMap<>();
+		H_PORTS.put(MacAddress.of("00:00:00:00:00:a1"), OFPort.of(1));
+		H_PORTS.put(MacAddress.of("00:00:00:00:00:a2"), OFPort.of(2));
+		H_PORTS.put(MacAddress.of("00:00:00:00:00:a3"), OFPort.of(3));
+	}
 }
