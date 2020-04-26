@@ -25,24 +25,24 @@ public class Parameters {
 	public final static TransportPort ADV_PORT = TransportPort.of(8787);
 
 	final static IPv4Address[] IP_ROUTER = {
-		IPv4Address.of("10.0.2.1"),
-		IPv4Address.of("10.0.2.2")
+		IPv4Address.of("10.0.2.1"), //r1
+		IPv4Address.of("10.0.2.2") //r2
 	};
 	
 	final static IPv4Address[] IP_HOST = { IPv4Address.of("10.0.2.3"), IPv4Address.of("10.0.2.4"), IPv4Address.of("10.0.2.5") };
 	
 	final static MacAddress[] MAC_ROUTER = {
-		MacAddress.of("00:00:00:00:00:01"),
-		MacAddress.of("00:00:00:00:00:02")
+		MacAddress.of("00:00:00:00:00:01"), //router 1
+		MacAddress.of("00:00:00:00:00:02") //router 2
 	};
 	
-	public final static IPv4Address VIRTUAL_IP = IPv4Address.of("10.0.2.254");
-	public final static MacAddress VIRTUAL_MAC = MacAddress.of("00:00:E5:00:01:01");
+	public final static IPv4Address VIRTUAL_IP = IPv4Address.of("10.0.2.254"); //virtual IP is the last addr of net 10.0.2
+	public final static MacAddress VIRTUAL_MAC = MacAddress.of("00:00:5E:00:01:01");
 	
 	//switch ports connected to routers, I can easily access them with ROUTER IDs
 	final static OFPort[] SW_PORTS = {
-			OFPort.of(4),
-			OFPort.of(5)			
+			OFPort.of(4),//r1
+			OFPort.of(5)	//r2		
 	};
 	
 	//for simplicity's sake, host's MAC addresses have been hardcoded with the respective port

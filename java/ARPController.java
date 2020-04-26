@@ -125,10 +125,11 @@ public class ARPController implements IOFMessageListener, IFloodlightModule {
 		// Cast the ARP request
 		ARP arpRequest = (ARP) eth.getPayload();
 		
+		//CASE 1
+		// Destination Virtual Router because we want to travel to network B
+		// host is trying to discover who has this virtual IP
+		// I (the controller) will respond to this ARP request
 		if(arpRequest.getTargetProtocolAddress().compareTo(Parameters.VIRTUAL_IP) == 0) { 
-			//Destination Virtual Router because we want to travel to network B
-			//host is trying to discover who has this virtual IP
-			//I (the controller) will respond to this ARP request
 			
 			System.out.printf("Managing Virtual ARP Request...");
 			// Generate ARP reply
@@ -173,8 +174,9 @@ public class ARPController implements IOFMessageListener, IFloodlightModule {
 			sw.write(pob.build());
 		}
 		else if(eth.getSourceMACAddress().compareTo(Parameters.MAC_ROUTER[0]) == 0 || eth.getSourceMACAddress().compareTo(Parameters.MAC_ROUTER[1])== 0) { 
-			//Destination node of network A, ARP coming from R2 (net B) aimed at discovering host_A address
-			//I want to hide the real MAC of R2 and mask it with the VIRTUAL MAC
+			//CASE 2
+			// Destination node of network A, ARP coming from R2 (gateway for net B) aimed at discovering host_A address
+			// I want to hide the real MAC of R2 and mask it with the VIRTUAL MAC
 					
 			System.out.println("Managing incoming ARP Request from net B...");
 			
@@ -347,6 +349,7 @@ public class ARPController implements IOFMessageListener, IFloodlightModule {
 		IPv4Address src = ipv4.getSourceAddress();
 		IPv4Address dst = ipv4.getDestinationAddress();
 		
+		// prepare the rules for incoming and outgoing ICMP packets
 		if(Parameters.MASTER_STATUS) {
 			ArrayList<OFAction> sendList = sendICMP(sw, pi, cntx, eth);
 			ArrayList<OFAction> recvList = recvICMP(sw, pi, cntx, eth);
@@ -355,7 +358,7 @@ public class ARPController implements IOFMessageListener, IFloodlightModule {
 			pob.setBufferId(pi.getBufferId());
 			pob.setInPort(OFPort.ANY);
 			
-			// Assign the action
+			// only save the actions needed for this case (captain obvious: if the destination = VMAC then it is an outgoing packet)
 			if(eth.getDestinationMACAddress().compareTo(Parameters.VIRTUAL_MAC) == 0)
 				pob.setActions(sendList);
 			else 
@@ -423,11 +426,6 @@ public class ARPController implements IOFMessageListener, IFloodlightModule {
 		    sw.write(fmb.build());
 		    
 		return actionList;
-		    
-		    // If we do not apply the same action to the packet we have received and we send it back the first packet will be lost
-		
-		// Create the Packet-Out and set basic data for it (buffer id and in port)
-		// Il packet_out viene creato solo se il packet_in era indirizzato al router (se vado dalla rete a alla b)
 	}
 	
 	//Add rule from network B to network A
@@ -469,7 +467,7 @@ public class ARPController implements IOFMessageListener, IFloodlightModule {
 		if(eth.getDestinationMACAddress().compareTo(Parameters.VIRTUAL_MAC) == 0) {
 			OFActionOutput output = actions.buildOutput()
 				    .setMaxLen(0xFFffFFff)
-				    .setPort(pi.getMatch().get(MatchField.IN_PORT)) //sistemare porta nel caso in cui il pkt viene da dx
+				    .setPort(pi.getMatch().get(MatchField.IN_PORT))
 				    .build();
 			actionList.add(output);
 		}
@@ -477,7 +475,7 @@ public class ARPController implements IOFMessageListener, IFloodlightModule {
 		else if(eth.getSourceMACAddress().compareTo(Parameters.MAC_ROUTER[1]) == 0) {
 			OFActionOutput output = actions.buildOutput()
 				    .setMaxLen(0xFFffFFff)
-				    .setPort(Parameters.H_PORTS.get(eth.getDestinationMACAddress())) //sistemare porta nel caso in cui il pkt viene da dx
+				    .setPort(Parameters.H_PORTS.get(eth.getDestinationMACAddress()))
 				    .build();
 			actionList.add(output);
 		}
